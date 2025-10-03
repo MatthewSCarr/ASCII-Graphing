@@ -5,7 +5,6 @@
 #include <iostream>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3/SDL.h>
-#include <Windows.h>
 
 struct Vector3D {
     float x, y, z;
@@ -21,7 +20,7 @@ std::string output = "";
 
 float const eqConst = -9.0f;
 Vector3D const varConst = { 0.0f, 0.0f, 0.0f };
-Vector3D const varSqrdConst = { -1.0f, 1.0f, 1.0f };
+Vector3D const varSqrdConst = { 1.0f, -1.0f,1.0f };
 Vector3D const zAxis = { 0.0f, 0.0f, 1.0f };
 
 float degToRad(float deg) {
@@ -54,8 +53,8 @@ static float traceDist(float ox, float oy, float oz, float dx, float dy, float d
     float t1 = (-B - sqrtDisc) / (2 * A);
     float t2 = (-B + sqrtDisc) / (2 * A);
 
-    if (t1 > 0.0f) return t1;
-    if (t2 > 0.0f) return t2;
+    if (t1 > 0.0f && (t2 < 0.0f || t1<=t2)) return t1;
+    if (t2 > 0.0f && (t1 < 0.0f || t2<=t1)) return t2;
     return std::numeric_limits<float>::infinity();
 }
 
@@ -82,7 +81,19 @@ int main() {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("ASCII Renderer", screenWidth * charW, screenHeight * charH, SDL_WINDOW_RESIZABLE);
+    TTF_Font* font = TTF_OpenFont("C:/Windows/Fonts/consola.ttf", 20);
+    if (!font) {
+        std::cerr << "Failed to load font" << "\n";
+        return 1;
+    }
+
+    int minx, maxx, miny, maxy, advance;
+    if (TTF_GetGlyphMetrics(font, 'A', &minx, &maxx, &miny, &maxy, &advance) == -1) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "TTF_GlyphMetrics failed: %s", SDL_GetError());
+        advance = charW;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("ASCII Renderer", screenWidth * advance, screenHeight * charH, SDL_WINDOW_RESIZABLE);
     if (!window) {
         std::cerr << "Could not create window" << "\n";
         return 1;
@@ -93,19 +104,6 @@ int main() {
         std::cerr << "Could not create renderer" << "\n";
         return 1;
     }
-
-    TTF_Font* font = TTF_OpenFont("C:/Windows/Fonts/consola.ttf", 20);
-    if (!font) {
-        std::cerr << "Failed to load font" << "\n";
-        return 1;
-    }
-
-    int minx, maxx, miny, maxy, advance;
-    if (TTF_GetGlyphMetrics(font, 'A', &minx, &maxx, &miny, &maxy, &advance) == -1) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "TTF_GlyphMetrics failed: %s", SDL_GetError());
-        advance = charW; // fallback
-    }
-
 
     bool done = false;
     while (!done) {
@@ -161,8 +159,8 @@ int main() {
                 else if (dist < 1.25f) output += "%";
                 else if (dist < 2.25f) output += "$";
                 else if (dist < 3.25f) output += "#";
-                else if (dist < 4.25f) output += "+";
-                else if (dist < 5.25f) output += "=";
+                else if (dist < 4.25f) output += "=";
+                else if (dist < 5.25f) output += "+";
                 else if (dist < 6.25f) output += ">";
                 else if (dist < 10.0f) output += "-";
                 else output += ".";
@@ -170,7 +168,6 @@ int main() {
             output += "\n";
         }
 
-        // NEW: render the full frame as one texture
         SDL_Color white = { 255,255,255,255 };
         SDL_Surface* surface = TTF_RenderText_Blended_Wrapped(font, output.c_str(), SDL_strlen(output.c_str()), white, screenWidth * charW);
         if (!surface) {
