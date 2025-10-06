@@ -11,16 +11,17 @@ struct Vector3D {
 };
 
 
-int const screenWidth = 100;
-int const screenHeight = 50;
+int const screenWidth = 110;
+int const screenHeight = 55;
 int const charW = 12, const charH = 18;
 float const stepSizeAng = 0.33f;
-float const mvStep = 0.01f;
+float const mvStep = 0.03f;
+float const zoomStep = 0.1f;
 std::string output = "";
 
-float const eqConst = -9.0f;
-Vector3D const varConst = { 0.0f, 0.0f, 0.0f };
-Vector3D const varSqrdConst = { 1.0f, -1.0f,1.0f };
+float eqConst = -9.0f;
+Vector3D varConst = { 0.0f, 0.0f, 0.0f };
+Vector3D varSqrdConst = { 1.0f, -1.0f,1.0f };
 Vector3D const zAxis = { 0.0f, 0.0f, 1.0f };
 
 float degToRad(float deg) {
@@ -68,42 +69,45 @@ static void moveOrigin(Vector3D& origin, Vector3D& mvDir, float currMag) {
     origin.z = origin.z * multiplier;
 }
 
+static void changeZoom(Vector3D& origin, float currMag, float incriment) {
+    float multiplier = (currMag + incriment) / currMag;
+    origin.x = origin.x * multiplier;
+    origin.y = origin.y * multiplier;
+    origin.z = origin.z * multiplier;
+}
+
 int main() {
+    std::cout << "WARNING: I WAS TOO LAZY TO ADD PROTECTION FROM MISINPUTS" << std::endl;
+    std::cout << "Inputs are in this form: Ax^2+ax+By^2+by+Cz^2+cz+d=0" << std::endl;
+    std::cout << "Please enter a value for A: ";
+    std::cin >> varSqrdConst.x;
+    std::cout << "Please enter a value for a: ";
+    std::cin >> varConst.x;
+    std::cout << "Please enter a value for B: ";
+    std::cin >> varSqrdConst.y;
+    std::cout << "Please enter a value for b: ";
+    std::cin >> varConst.y;
+    std::cout << "Please enter a value for C: ";
+    std::cin >> varSqrdConst.z;
+    std::cout << "Please enter a value for c: ";
+    std::cin >> varConst.z;
+    std::cout << "Please enter a value for D: ";
+    std::cin >> eqConst;
+
     Vector3D origin = { 4, 4, 4 };
 
-    if (SDL_Init(SDL_INIT_VIDEO) != true) {
-        std::cerr << "SDL_Init failed" << "\n";
-        return 1;
-    }
+    SDL_Init(SDL_INIT_VIDEO);
 
-    if (TTF_Init() == -1) {
-        std::cerr << "TTF_Init failed" << "\n";
-        return 1;
-    }
+    TTF_Init();
 
     TTF_Font* font = TTF_OpenFont("C:/Windows/Fonts/consola.ttf", 20);
-    if (!font) {
-        std::cerr << "Failed to load font" << "\n";
-        return 1;
-    }
 
     int minx, maxx, miny, maxy, advance;
-    if (TTF_GetGlyphMetrics(font, 'A', &minx, &maxx, &miny, &maxy, &advance) == -1) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "TTF_GlyphMetrics failed: %s", SDL_GetError());
-        advance = charW;
-    }
+    TTF_GetGlyphMetrics(font, 'A', &minx, &maxx, &miny, &maxy, &advance);
 
     SDL_Window* window = SDL_CreateWindow("ASCII Renderer", screenWidth * advance, screenHeight * charH, SDL_WINDOW_RESIZABLE);
-    if (!window) {
-        std::cerr << "Could not create window" << "\n";
-        return 1;
-    }
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
-    if (!renderer) {
-        std::cerr << "Could not create renderer" << "\n";
-        return 1;
-    }
 
     bool done = false;
     while (!done) {
@@ -117,10 +121,12 @@ int main() {
             if (event.type == SDL_EVENT_QUIT) done = true;
             if (event.type == SDL_EVENT_KEY_DOWN) {
                 switch (event.key.key) {
-                case SDLK_A: moveOrigin(origin, horizV, -currMag); break;
-                case SDLK_D: moveOrigin(origin, horizV, currMag); break;
-                case SDLK_W: moveOrigin(origin, vertV, -currMag); break;
-                case SDLK_S: moveOrigin(origin, vertV, currMag); break;
+                    case SDLK_A: moveOrigin(origin, horizV, -currMag); break;
+                    case SDLK_D: moveOrigin(origin, horizV, currMag); break;
+                    case SDLK_W: moveOrigin(origin, vertV, -currMag); break;
+                    case SDLK_S: moveOrigin(origin, vertV, currMag); break;
+                    case SDLK_UP: changeZoom(origin, currMag, -zoomStep); break;
+                    case SDLK_DOWN: changeZoom(origin, currMag, zoomStep); break;
                 }
             }
         }
@@ -170,26 +176,15 @@ int main() {
 
         SDL_Color white = { 255,255,255,255 };
         SDL_Surface* surface = TTF_RenderText_Blended_Wrapped(font, output.c_str(), SDL_strlen(output.c_str()), white, screenWidth * charW);
-        if (!surface) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "TTF_RenderText failed: %s", SDL_GetError());
-        }
-        else {
-            SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-            SDL_DestroySurface(surface);
-
-            if (!texture) {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
-            }
-            else {
-                SDL_FRect dstRect = {
-                    0.0f, 0.0f,
-                    static_cast<float>(screenWidth * charW),
-                    static_cast<float>(screenHeight * charH)
-                };
-                SDL_RenderTexture(renderer, texture, nullptr, &dstRect);
-                SDL_DestroyTexture(texture);
-            }
-        }
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_DestroySurface(surface);
+        SDL_FRect dstRect = {
+            0.0f, 0.0f,
+            static_cast<float>(screenWidth * charW),
+            static_cast<float>(screenHeight * charH)
+        };
+        SDL_RenderTexture(renderer, texture, nullptr, &dstRect);
+        SDL_DestroyTexture(texture);
 
         SDL_RenderPresent(renderer);
     }
